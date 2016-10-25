@@ -13,8 +13,12 @@
 
 		<!-- for testing with local version of cytoscape.js -->
 		<!--<script src="../cytoscape.js/build/cytoscape.js"></script>-->
-
-		<script src="cytoscape-node-resize.js"></script>
+                
+                <script src="lib/cytoscape-undo-redo.js"></script>
+<!--                <script src="https://cdn.rawgit.com/ivis-at-bilkent/cytoscape.js-undo-redo/master/cytoscape-undo-redo.js"></script>-->
+                <!--<script src="https://cdn.rawgit.com/ivis-at-bilkent/cytoscape.js-compound-resize/master/cytoscape-compound-resize.js"></script>-->
+		<script src="lib/cytoscape-compound-resize.js"></script>
+                <script src="cytoscape-node-resize.js"></script>
 
 		<style>
 			body {
@@ -70,7 +74,9 @@
 					elements: {
 						nodes: [
 							{ data: { id: 'j', name: 'Aspected Resize' }, classes: "fixedAspectRatioResizeMode" },
-							{ data: { id: 'e', name: 'Full Resize' } },
+							{ data: { id: 'p', name: 'Parent', parent: 'j' } },
+                                                        { data: { id: 's', name: 'Sibling', parent: 'j' } },
+                                                        { data: { id: 'e', name: 'Full Resize', parent: 'p' } },
 							{ data: { id: 'g', name: 'Multi Node Resize (Full)' } },
 							{ data: { id: 'k', name: 'No Resize' }, classes: "noResizeMode" }
 						],
@@ -85,10 +91,23 @@
 							{ data: { source: 'k', target: 'g' } },
 							{ data: { source: 'g', target: 'j' } }
 						]
-					}
+					},
+                                        ready: function() {
+                                            document.addEventListener("keydown", function (e) {
+                                                if (e.ctrlKey)
+                                                    if (e.which === 90)
+                                                        cy.undoRedo().undo();
+                                                    else if (e.which === 89)
+                                                        cy.undoRedo().redo();
+                                                });
+                                        }
 				});
+                                
+                                cy.undoRedo({});
 
-				cy.nodeResize();
+				cy.nodeResize({
+                                    undoable: true
+                                });
 
 				cy.on("resizestart", function (e, type) {
 					console.log(type);
@@ -96,6 +115,11 @@
 
 				cy.on("resizeend", function (e, type) {
 					document.body.style.cursor = 'initial';
+				});
+                                
+                                cy.on("resizedrag", function (e, type, nodes) {
+					console.log('resizing');
+                                        console.log(nodes.length);
 				});
 
 			});

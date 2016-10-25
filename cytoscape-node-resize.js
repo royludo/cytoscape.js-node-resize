@@ -20,6 +20,7 @@
             boundingRectangleLineColor: "red",
             boundingRectangleLineWidth: 1.5,
             zIndex: 999,
+            enableCompoundResize: true,
 
             minWidth: function (node) {
                 var data = node.data("resizeMinWidth");
@@ -31,7 +32,7 @@
             }, // a function returns min height of node
 
             isFixedAspectRatioResizeMode: function (node) { return node.is(".fixedAspectRatioResizeMode") },// with only 4 active grapples (at corners)
-            isNoResizeMode: function (node) { return node.is(".noResizeMode, :parent") }, // no active grapples
+            isNoResizeMode: function (node) { return node.is(".noResizeMode") }, // no active grapples
 
             cursors: { // See http://www.w3schools.com/cssref/tryit.asp?filename=trycss_cursor
                 // May take any "cursor" css property
@@ -288,6 +289,15 @@
             var cy = this;
 
             options = $.extend(true, options, opts);
+            
+            if (cy.compoundResize) {
+              if (options.enableCompoundResize) {
+                cy.compoundResize('min');
+              }
+              else {
+                cy.compoundResize('free');
+              }
+            }
 
             var $canvas = $('<canvas id="node-resize"></canvas>');
             var $container = $(cy.container());
@@ -370,7 +380,9 @@
             };
 
             var drawGrapple = function (x, y, t, n, cur) {
-                if (options.isNoResizeMode(n) || (options.isFixedAspectRatioResizeMode(n) && t.indexOf("center") >= 0)) {
+                if (options.isNoResizeMode(n) || 
+                        (n.is(':parent') && ( !cy.compoundResize || cy.compoundResize("get").getMode() === 'free')) ||
+                        (options.isFixedAspectRatioResizeMode(n) && t.indexOf("center") >= 0)) {
                     var inactiveGrapple = canvas.display.rectangle({
                         x: x,
                         y: y,
@@ -486,9 +498,9 @@
 
 
                             var isAspectedMode = options.isFixedAspectRatioResizeMode(node);
-                            if ((isAspectedMode && t.indexOf("center") >= 0) ||
-                                options.isNoResizeMode(node))
+                            if ( (isAspectedMode && t.indexOf("center") >= 0) || options.isNoResizeMode(node) ) {
                                 continue;
+                            }
 
                             if (isAspectedMode) {
                                 var aspectRatio = node.height() / node.width();
@@ -496,36 +508,83 @@
                                 var aspectedSize = Math.min(xWidth, xHeight);
 
                                 var isCrossCorners = (t == "topright") || (t == "bottomleft");
-                                if (xWidth > xHeight)
+                                if (xWidth > xHeight) {
                                     xHeight = xWidth * aspectRatio * (isCrossCorners ? -1 : 1);
-                                else
+                                } 
+                                else {
                                     xWidth = xHeight / aspectRatio * (isCrossCorners ? -1 : 1);
-
+                                }
                             }
 
 
                             var nodePos = node.position();
+                            
+                            var compoundResizeAPI = cy.compoundResize('get');
+                            var isCompoundResize = node.is(':parent') && cy.compoundResize 
+                                    && compoundResizeAPI.getMode() === 'min';
 
                             if (t.startsWith("top")) {
                                 if (node.height() - xHeight > options.minHeight(node)) {
-                                    node.position("y", nodePos.y + xHeight / 2);
-                                    node.css("height", node.height() - xHeight);
-                                } else if (isAspectedMode)
+                                    if(isCompoundResize) {
+                                        var newPaddings = {
+                                            top: parseFloat( node.css('padding-top') ) - xHeight
+                                        };
+                                        
+                                        compoundResizeAPI.setExtremePaddings(node, newPaddings, 'max');
+                                        compoundResizeAPI.setPaddings(node, newPaddings);
+                                    }
+                                    else {
+                                        node.position("y", nodePos.y + xHeight / 2);
+                                        node.css("height", node.height() - xHeight);
+                                    }
+                                } else if (isAspectedMode) {
                                     continue;
+                                }
                             } else if (t.startsWith("bottom")) {
                                 if (node.height() + xHeight > options.minHeight(node)) {
-                                    node.position("y", nodePos.y + xHeight / 2);
-                                    node.css("height", node.height() + xHeight);
-                                } else if (isAspectedMode)
+                                    if(isCompoundResize) {
+                                        var newPaddings = {
+                                            bottom: parseFloat( node.css('padding-bottom') ) + xHeight
+                                        };
+                                        
+                                        compoundResizeAPI.setExtremePaddings(node, newPaddings, 'max');
+                                        compoundResizeAPI.setPaddings(node, newPaddings);
+                                    }
+                                    else {
+                                        node.position("y", nodePos.y + xHeight / 2);
+                                        node.css("height", node.height() + xHeight);
+                                    }
+                                } else if (isAspectedMode) {
                                     continue;
+                                }
                             }
 
                             if (t.endsWith("left") && node.width() - xWidth > options.minWidth(node)) {
-                                node.position("x", nodePos.x + xWidth / 2);
-                                node.css("width", node.width() - xWidth);
+                                if(isCompoundResize) {
+                                    var newPaddings = {
+                                        left: parseFloat( node.css('padding-left') ) - xWidth
+                                    };
+
+                                    compoundResizeAPI.setExtremePaddings(node, newPaddings, 'max');
+                                    compoundResizeAPI.setPaddings(node, newPaddings);
+                                }
+                                else {
+                                    node.position("x", nodePos.x + xWidth / 2);
+                                    node.css("width", node.width() - xWidth);
+                                }
                             } else if (t.endsWith("right") && node.width() + xWidth > options.minWidth(node)) {
-                                node.position("x", nodePos.x + xWidth / 2);
-                                node.css("width", node.width() + xWidth);
+                                if(isCompoundResize) {
+                                    var newPaddings = {
+                                        right: parseFloat( node.css('padding-right') ) + xWidth
+                                    };
+
+                                    compoundResizeAPI.setExtremePaddings(node, newPaddings, 'max');
+                                    compoundResizeAPI.setPaddings(node, newPaddings);
+                                }
+                                else {
+                                    node.position("x", nodePos.x + xWidth / 2);
+                                    node.css("width", node.width() + xWidth);
+                                }
                             }
                         }
                     });
@@ -654,6 +713,7 @@
             if (cy.undoRedo && options.undoable) {
 
                 var firstMap = { };
+                var paddingsMap;
 
                 cy.on("resizestart", function (e, type, nodes) {
                     nodes.each(function (i, ele) {
@@ -665,6 +725,8 @@
                             position: $.extend({}, ele.position())
                         };
                     });
+                    
+                    paddingsMap = cy.undoRedo().getPaddingsMap();
                 });
 
                 var resizeDo = function (arg) {
@@ -698,8 +760,13 @@
                 cy.undoRedo().action("resize", resizeDo, resizeDo);
 
                 cy.on("resizeend", function (e, type, nodes) {
-                    cy.undoRedo().do("resize", { firstMap: firstMap, nodes: nodes });
+                    cy.undoRedo().do("resize", {
+                      firstMap: firstMap, 
+                      nodes: nodes,
+                      paddingsToReturn: paddingsMap
+                    });
                     firstMap = { };
+                    paddingsMap = undefined;
                 });
             }
 
